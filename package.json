@@ -1,21 +1,25 @@
 {
-  "name": "koishi-plugin-autohajimi-lizard",
-  "description": "自动为你的色图进行哈基米马赛克处理",
+  "name": "koishi-plugin-hajimi-lizard",
+  "description": "给你的色图打上哈基米马赛克",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lizard0126/hajimi-lizard.git"
+  },
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
     "lib",
+    "src",
     "dist"
   ],
   "license": "MIT",
-  "scripts": {},
   "keywords": [
     "chatbot",
     "koishi",
-    "plugin"
+    "色图",
+    "马赛克"
   ],
-  "devDependencies": {},
   "peerDependencies": {
     "koishi": "^4.18.7"
   }
