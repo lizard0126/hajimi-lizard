@@ -1,6 +1,6 @@
 # koishi-plugin-autohajimi-lizard
 
-[![npm](https://img.shields.io/npm/v/koishi-plugin-autohajimi-lizard?style=flat-square)](https://www.npmjs.com/package/koishi-plugin-autohajimi-lizard)
+[![npm](https://img.shields.io/npm/v/koishi-plugin-hajimi-lizard?style=flat-square)](https://www.npmjs.com/package/koishi-plugin-hajimi-lizard)
 
 # 😎给你的色图打上哈基马赛克
 

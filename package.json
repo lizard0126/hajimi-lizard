@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-hajimi-lizard",
   "description": "给你的色图打上哈基米马赛克",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lizard0126/hajimi-lizard.git"
