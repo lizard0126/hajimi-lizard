@@ -16,32 +16,32 @@
 
 <summary><strong><span style="font-size: 1.3em; color: #2a2a2a;">使用方法</span></strong></summary>
 
-### 处理图片
-#### 示例：
+### 指令示例：
 <pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">猫赛克 [图片] // 给图片打上哈基码</pre>
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">猫赛克 [图片][图片][图片] // 支持多图</pre>
 
-- 使用此指令处理传入的图片并添加猫赛克效果。
+- 使用此指令传入图片，添加猫赛克效果。
 - 图片将通过预设的猫头和猫纹路进行处理。
 
-### 配置选项
-<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">配置 Python 路径：
-C:/Users/user/AppData/Local/Programs/Python/Python313/python.exe</pre>
+### 配置python路径（pythonPath）：
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">填写你Python解释器的路径</pre>
 - 你可以在插件配置中设置 pythonPath 来指定 Python 解释器的路径。默认情况下，插件将使用系统环境变量中的 Python 路径。
+- 路径大多为：C:\\Users\\yourPC\\AppData\\Local\\Programs\\Python\\Python313\\python.exe
 
 #### 修改系统环境变量：
 - **Linux/macOS**：
   在终端中设置 PYTHON_PATH 环境变量：
-  <pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">export PYTHON_PATH=/path/to/python</pre>
+  <pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">export PYTHON_PATH=你python的路径</pre>
 
 - **Windows**：
   在命令行中设置 PYTHON_PATH 环境变量：
-  <pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">set PYTHON_PATH=C:\\path\\to\\python.exe</pre>
+  <pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">set PYTHON_PATH=你python.exe的路径</pre>
 
-#### 配置猫纹路的图片：
-<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">配置猫纹路图片：patternPath=/path/to/pattern.png</pre>
+### 配置猫纹路的图片（patternPath）：
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">仅支持本地图片！</pre>
 
-#### 配置猫头的图片：
-<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">配置猫头图片：headPath=/path/to/head.png</pre>
+### 配置猫头的图片（headPath）：
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">仅支持本地图片！</pre>
 
 </details>
 

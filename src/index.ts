@@ -1,5 +1,6 @@
 import { Context, Schema, h } from 'koishi'
 import { spawn, exec } from 'child_process'
+import { createHash } from 'crypto'
 import { promisify } from 'util'
 import { join } from 'path'
 import fs from 'fs'
@@ -23,32 +24,32 @@ export const usage = `
 
 <summary><strong><span style="font-size: 1.3em; color: #2a2a2a;">使用方法</span></strong></summary>
 
-### 处理图片
-#### 示例：
+### 指令示例：
 <pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">猫赛克 [图片] // 给图片打上哈基码</pre>
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">猫赛克 [图片][图片][图片] // 支持多图</pre>
 
-- 使用此指令处理传入的图片并添加猫赛克效果。
+- 使用此指令传入图片，添加猫赛克效果。
 - 图片将通过预设的猫头和猫纹路进行处理。
 
-### 配置选项
-<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">配置 Python 路径：
-C:/Users/user/AppData/Local/Programs/Python/Python313/python.exe</pre>
+### 配置python路径（pythonPath）：
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">填写你Python解释器的路径</pre>
 - 你可以在插件配置中设置 pythonPath 来指定 Python 解释器的路径。默认情况下，插件将使用系统环境变量中的 Python 路径。
+- 路径大多为：C:\\Users\\yourPC\\AppData\\Local\\Programs\\Python\\Python313\\python.exe
 
 #### 修改系统环境变量：
 - **Linux/macOS**：
   在终端中设置 PYTHON_PATH 环境变量：
-  <pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">export PYTHON_PATH=/path/to/python</pre>
+  <pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">export PYTHON_PATH=你python的路径</pre>
 
 - **Windows**：
   在命令行中设置 PYTHON_PATH 环境变量：
-  <pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">set PYTHON_PATH=C:\\path\\to\\python.exe</pre>
+  <pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">set PYTHON_PATH=你python.exe的路径</pre>
 
-#### 配置猫纹路的图片：
-<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">配置猫纹路图片：patternPath=/path/to/pattern.png</pre>
+### 配置猫纹路的图片（patternPath）：
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">仅支持本地图片！</pre>
 
-#### 配置猫头的图片：
-<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">配置猫头图片：headPath=/path/to/head.png</pre>
+### 配置猫头的图片（headPath）：
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">仅支持本地图片！</pre>
 
 </details>
 
@@ -69,13 +70,45 @@ export interface Config {
   pythonPath: string
   patternPath: string
   headPath: string
+  autoClean?: boolean
 }
 
 export const Config: Schema<Config> = Schema.object({
-  pythonPath: Schema.string().description('指定 python.exe路径（为空则使用系统环境变量，不是用户环境变量）').default(''),
-  patternPath: Schema.string().description('猫纹路图片路径，为空则默认').default(''),
-  headPath: Schema.string().description('猫头图片路径，为空则默认').default(''),
+  pythonPath: Schema.string().description('指定 python.exe路径（为空则使用系统环境变量）').default(''),
+  patternPath: Schema.string().description('猫纹路图片路径（形如C:/Users/82545/Desktop/pic.jpg），为空则默认').default(''),
+  headPath: Schema.string().description('猫头图片路径（形如C:/Users/82545/Desktop/pic.jpg），为空则默认').default(''),
+  autoClean: Schema.boolean().description('是否自动清理临时文件').default(true),
 })
+
+const SUPPORTED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp'])
+const DEFAULT_TIMEOUT = 10000
+
+// 扩展名
+function getExtFromUrl(url: string) {
+  return url.split('.').pop()?.split(/\#|\?/)[0]?.toLowerCase()
+}
+
+// 运行脚本
+async function runPythonScript(pythonExec: string, args: string[], cwd: string) {
+  const process = spawn(pythonExec, args, { cwd })
+
+  let stdout = ''
+  let stderr = ''
+  process.stdout.on('data', (data) => stdout += data)
+  process.stderr.on('data', (data) => stderr += data)
+
+  const exitCode = await new Promise<number>((resolve) => {
+    process.on('close', resolve)
+  })
+
+  return { exitCode, stdout, stderr }
+}
+
+// 计算哈希
+function hashFile(path: string) {
+  const content = fs.readFileSync(path, 'utf-8')
+  return createHash('sha256').update(content).digest('hex')
+}
 
 export async function apply(ctx: Context, config: Config) {
   const cacheDir = join(ctx.baseDir, 'cache/hajimi')
@@ -85,6 +118,7 @@ export async function apply(ctx: Context, config: Config) {
   const requirementsPath = join(hajimiDir, 'requirements.txt')
   const batchScript = join(hajimiDir, 'batch_process.py')
   const depsFlagPath = join(cacheDir, '.deps_installed')
+
   const patternImage = config.patternPath || join(hajimiDir, 'assets/pattern.png')
   const headImage = config.headPath || join(hajimiDir, 'assets/head.png')
 
@@ -92,7 +126,7 @@ export async function apply(ctx: Context, config: Config) {
   fs.mkdirSync(outputDir, { recursive: true })
 
   let pythonExec = config.pythonPath || process.env.PYTHON_PATH || 'python'
-  ctx.logger('hajimi').error(pythonExec)
+
   try {
     await execPromise(`${pythonExec} --version`)
   } catch (e) {
@@ -100,77 +134,95 @@ export async function apply(ctx: Context, config: Config) {
     return
   }
 
-  if (!fs.existsSync(depsFlagPath)) {
+  let installDeps = true
+  let currentHash = ''
+  if (fs.existsSync(depsFlagPath)) {
     try {
-      ctx.logger('hajimi').info('正在安装Python依赖...')
-      await execPromise(`${pythonExec} -m pip install -r ${requirementsPath}`)
-      fs.writeFileSync(depsFlagPath, '')
+      const savedHash = fs.readFileSync(depsFlagPath, 'utf-8')
+      currentHash = hashFile(requirementsPath)
+      if (savedHash === currentHash) {
+        installDeps = false
+      }
+    } catch (e) {
+      ctx.logger('hajimi').warn('读取依赖缓存失败，将重新安装依赖')
+    }
+  }
+
+  if (installDeps) {
+    try {
+      ctx.logger('hajimi').info('首次运行或依赖变更，正在安装 Python 依赖...')
+      await execPromise(`"${pythonExec}" -m pip install -r "${requirementsPath}"`)
+      currentHash ||= hashFile(requirementsPath)
+      fs.writeFileSync(depsFlagPath, currentHash)
+      ctx.logger('hajimi').info('依赖安装完成')
     } catch (e) {
       ctx.logger('hajimi').error(`依赖安装失败: ${e.stderr || e.message}`)
       return
     }
+  } else {
+    ctx.logger('hajimi').info('Python 依赖已安装，跳过安装步骤')
   }
 
-  ctx.command('猫赛克 <image:image>', '处理图片')
-    .action(async ({ session }, image) => {
-      if (!image) return '请在指令后加上需要处理的图片'
+  ctx.command('猫赛克 ', '处理图片')
+    .action(async ({ session }) => {
+      const images = session.elements.filter(el => el.type === 'img')
+      if (!images.length) return '请在指令后加上需要处理的图片'
 
       const timestamp = Date.now()
       const currentInput = join(inputDir, String(timestamp))
       const currentOutput = join(outputDir, String(timestamp))
+
       fs.mkdirSync(currentInput, { recursive: true })
       fs.mkdirSync(currentOutput, { recursive: true })
 
-      try {
-        const buffer = Buffer.from(await ctx.http.get<Buffer>(image.src, {
-          responseType: 'arraybuffer',
-          timeout: 10000,
-        }))
+      await Promise.all(images.map(async (el, i) => {
+        const src = el.attrs?.src
+        if (!src) return
 
-        const inputPath = join(currentInput, `0.jpg`)
-        fs.writeFileSync(inputPath, buffer)
-        const [tipMessageId] = await session.send('图片处理中，请稍候...')
+        try {
+          const buffer = await ctx.http.get<Buffer>(src, {
+            responseType: 'arraybuffer',
+            timeout: DEFAULT_TIMEOUT,
+          })
 
-        const args = [
+          const ext = SUPPORTED_EXTENSIONS.has(getExtFromUrl(src)) ? getExtFromUrl(src) : 'jpg'
+          fs.writeFileSync(join(currentInput, `${i}.${ext}`), Buffer.from(buffer))
+        } catch (e) {
+          ctx.logger('hajimi').warn(`下载第 ${i + 1} 张图片失败:`, e)
+        }
+      }))
+
+      const [tipMessageId] = await session.send('图片处理中，请稍候...')
+
+      const { exitCode, stderr } = await runPythonScript(
+        pythonExec,
+        [
           batchScript,
           currentInput,
           currentOutput,
           '--pattern_image', patternImage,
           '--head_image', headImage,
-        ]
+        ],
+        hajimiDir
+      )
 
-        const process = spawn(pythonExec, args, {
-          cwd: hajimiDir,
-        })
+      if (exitCode !== 0) {
+        await session.send(`处理失败`)
+        ctx.logger.error(stderr)
+      }
 
-        let stdout = ''
-        let stderr = ''
-        process.stdout.on('data', (data) => stdout += data)
-        process.stderr.on('data', (data) => stderr += data)
+      const files = fs.readdirSync(currentOutput)
+      if (!files.length) {
+        await session.send('未生成输出文件，可能还不够色')
+      }
 
-        const exitCode = await new Promise<number>((resolve) => {
-          process.on('close', resolve)
-        })
+      await session.bot.deleteMessage(session.channelId, tipMessageId);
 
-        if (exitCode !== 0) {
-          ctx.logger('hajimi').error(`处理失败: ${stderr}`)
-          throw new Error('图片处理失败')
-        }
+      await Promise.all(files.map(file =>
+        session.send(h.image(`file://${join(currentOutput, file)}`))
+      ))
 
-        const files = fs.readdirSync(currentOutput)
-        if (!files.length) {
-          throw new Error('未生成输出文件')
-        }
-
-        await session.bot.deleteMessage(session.channelId, tipMessageId);
-        for (const file of files) {
-          await session.send(h.image(`file://${join(currentOutput, file)}`))
-        }
-
-      } catch (e) {
-        ctx.logger('hajimi').error(e)
-        return `处理出错: ${e.message}`
-      } finally {
+      if (config.autoClean !== false) {
         try {
           fs.rmSync(currentInput, { recursive: true, force: true })
           fs.rmSync(currentOutput, { recursive: true, force: true })
