@@ -4,7 +4,7 @@ import { createHash } from 'crypto'
 import { promisify } from 'util'
 import { join } from 'path'
 import fs from 'fs'
-// npm publish --workspace koishi-plugin-hajimi-lizard --access public --registry https://registry.npmjs.org
+
 const execPromise = promisify(exec)
 
 export const name = 'hajimi-lizard'
