@@ -75,7 +75,7 @@ export interface Config {
 
 export const Config: Schema<Config> = Schema.object({
   pythonPath: Schema.string().description('指定 python.exe路径（为空则使用系统环境变量）').default(''),
-  patternPath: Schema.string().description('猫纹路图片路径（形如C:/Users/82545/Desktop/pic.jpg），为空则默认').default(''),
+  patternPath: Schema.string().description('填充纹路图片路径（形如C:/Users/82545/Desktop/pic.jpg），为空则默认').default(''),
   headPath: Schema.string().description('猫头图片路径（形如C:/Users/82545/Desktop/pic.jpg），为空则默认').default(''),
   autoClean: Schema.boolean().description('是否自动清理临时文件').default(true),
 })
@@ -83,12 +83,10 @@ export const Config: Schema<Config> = Schema.object({
 const SUPPORTED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp'])
 const DEFAULT_TIMEOUT = 10000
 
-// 扩展名
 function getExtFromUrl(url: string) {
   return url.split('.').pop()?.split(/\#|\?/)[0]?.toLowerCase()
 }
 
-// 运行脚本
 async function runPythonScript(pythonExec: string, args: string[], cwd: string) {
   const process = spawn(pythonExec, args, { cwd })
 
@@ -104,7 +102,6 @@ async function runPythonScript(pythonExec: string, args: string[], cwd: string) 
   return { exitCode, stdout, stderr }
 }
 
-// 计算哈希
 function hashFile(path: string) {
   const content = fs.readFileSync(path, 'utf-8')
   return createHash('sha256').update(content).digest('hex')

@@ -1,4 +1,4 @@
-# koishi-plugin-autohajimi-lizard
+# koishi-plugin-hajimi-lizard
 
 [![npm](https://img.shields.io/npm/v/koishi-plugin-hajimi-lizard?style=flat-square)](https://www.npmjs.com/package/koishi-plugin-hajimi-lizard)
 
