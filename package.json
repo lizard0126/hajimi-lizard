@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-hajimi-lizard",
-  "description": "给你的色图打上哈基米马赛克",
-  "version": "0.0.4",
+  "description": "给你的色图打上哈基米马赛克，并提供可调用的打码服务",
+  "version": "1.0.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/lizard0126/hajimi-lizard.git"
@@ -18,8 +18,14 @@
     "chatbot",
     "koishi",
     "色图",
+    "打码",
     "马赛克"
   ],
+  "service": {
+    "implements": [
+      "hajimi"
+    ]
+  },
   "peerDependencies": {
     "koishi": "^4.18.7"
   }

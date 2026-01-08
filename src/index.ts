@@ -1,11 +1,5 @@
 import { Context, Schema, h } from 'koishi'
-import { spawn, exec } from 'child_process'
-import { createHash } from 'crypto'
-import { promisify } from 'util'
-import { join } from 'path'
-import fs from 'fs'
-
-const execPromise = promisify(exec)
+import { HajimiProcessor, hajimi } from './hajimi'
 
 export const name = 'hajimi-lizard'
 
@@ -21,7 +15,50 @@ export const usage = `
 ---
 
 <details>
+<summary><strong><span style="font-size: 1.3em; color: #2a2a2a;">调用服务示例</span></strong></summary>
 
+### 外部插件如何调用 hajimi 服务
+
+- 首先在外部插件里声明依赖：
+
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">export const inject = ['hajimi']</pre>
+
+- 在index中注册服务：
+
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
+ctx.hajimi = {
+  processImages: (inputs) => processor.processImages(inputs),
+}
+</pre>
+
+- 然后就可以通过 ctx.hajimi.processImages 调用：
+
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
+const urls = [
+  'https://example.com/a.jpg',
+  'https://example.com/b.png'
+]
+
+try {
+  const results = await ctx.hajimi.processImages(urls)
+  if (!paths || !paths.length) {
+    return '未生成输出文件，可能图片不够色或处理失败'
+  }
+  for (const p of results) {
+    await session.send(h.image(\`file://\${p}\`))
+  }
+} catch (e) {
+  ctx.logger('hajimi').error(e)
+  return '处理失败'
+}
+</pre>
+
+- processImages 接收图片 URL 数组，返回本地生成图片路径数组
+- 如果返回为空，说明未生成输出文件
+
+</details>
+
+<details>
 <summary><strong><span style="font-size: 1.3em; color: #2a2a2a;">使用方法</span></strong></summary>
 
 ### 指令示例：
@@ -80,152 +117,45 @@ export const Config: Schema<Config> = Schema.object({
   autoClean: Schema.boolean().description('是否自动清理临时文件').default(true),
 })
 
-const SUPPORTED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp'])
-const DEFAULT_TIMEOUT = 10000
-
-function getExtFromUrl(url: string) {
-  return url.split('.').pop()?.split(/\#|\?/)[0]?.toLowerCase()
-}
-
-async function runPythonScript(pythonExec: string, args: string[], cwd: string) {
-  const process = spawn(pythonExec, args, { cwd })
-
-  let stdout = ''
-  let stderr = ''
-  process.stdout.on('data', (data) => stdout += data)
-  process.stderr.on('data', (data) => stderr += data)
-
-  const exitCode = await new Promise<number>((resolve) => {
-    process.on('close', resolve)
-  })
-
-  return { exitCode, stdout, stderr }
-}
-
-function hashFile(path: string) {
-  const content = fs.readFileSync(path, 'utf-8')
-  return createHash('sha256').update(content).digest('hex')
+declare module 'koishi' {
+  interface Context {
+    hajimi: hajimi
+  }
 }
 
 export async function apply(ctx: Context, config: Config) {
-  const cacheDir = join(ctx.baseDir, 'cache/hajimi')
-  const inputDir = join(cacheDir, 'input')
-  const outputDir = join(cacheDir, 'output')
-  const hajimiDir = join(__dirname, '../src')
-  const requirementsPath = join(hajimiDir, 'requirements.txt')
-  const batchScript = join(hajimiDir, 'batch_process.py')
-  const depsFlagPath = join(cacheDir, '.deps_installed')
+  const processor = new HajimiProcessor(ctx, config)
+  await processor.init()
 
-  const patternImage = config.patternPath || join(hajimiDir, 'assets/pattern.png')
-  const headImage = config.headPath || join(hajimiDir, 'assets/head.png')
-
-  fs.mkdirSync(inputDir, { recursive: true })
-  fs.mkdirSync(outputDir, { recursive: true })
-
-  let pythonExec = config.pythonPath || process.env.PYTHON_PATH || 'python'
-
-  try {
-    await execPromise(`${pythonExec} --version`)
-  } catch (e) {
-    ctx.logger('hajimi').error(`Python不可用，请检查环境: ${e.message}`)
-    return
+  // 注册 Service
+  ctx.hajimi = {
+    processImages: (inputs) => processor.processImages(inputs),
   }
 
-  let installDeps = true
-  let currentHash = ''
-  if (fs.existsSync(depsFlagPath)) {
-    try {
-      const savedHash = fs.readFileSync(depsFlagPath, 'utf-8')
-      currentHash = hashFile(requirementsPath)
-      if (savedHash === currentHash) {
-        installDeps = false
-      }
-    } catch (e) {
-      ctx.logger('hajimi').warn('读取依赖缓存失败，将重新安装依赖')
-    }
-  }
-
-  if (installDeps) {
-    try {
-      ctx.logger('hajimi').info('首次运行或依赖变更，正在安装 Python 依赖...')
-      await execPromise(`"${pythonExec}" -m pip install -r "${requirementsPath}"`)
-      currentHash ||= hashFile(requirementsPath)
-      fs.writeFileSync(depsFlagPath, currentHash)
-      ctx.logger('hajimi').info('依赖安装完成')
-    } catch (e) {
-      ctx.logger('hajimi').error(`依赖安装失败: ${e.stderr || e.message}`)
-      return
-    }
-  } else {
-    ctx.logger('hajimi').info('Python 依赖已安装，跳过安装步骤')
-  }
-
-  ctx.command('猫赛克 ', '处理图片')
+  ctx.command('猫赛克', '给图片打上哈基马赛克')
     .action(async ({ session }) => {
-      const images = session.elements.filter(el => el.type === 'img')
-      if (!images.length) return '请在指令后加上需要处理的图片'
+      const images = session.elements
+        .filter(el => el.type === 'img')
+        .map(el => el.attrs.src)
 
-      const timestamp = Date.now()
-      const currentInput = join(inputDir, String(timestamp))
-      const currentOutput = join(outputDir, String(timestamp))
+      if (!images.length) return '请在指令后添加图片'
 
-      fs.mkdirSync(currentInput, { recursive: true })
-      fs.mkdirSync(currentOutput, { recursive: true })
+      const [msgId] = await session.send('图片处理中，请稍候...')
 
-      await Promise.all(images.map(async (el, i) => {
-        const src = el.attrs?.src
-        if (!src) return
+      try {
+        const paths = await ctx.hajimi.processImages(images)
+        await session.bot.deleteMessage(session.channelId, msgId)
 
-        try {
-          const buffer = await ctx.http.get<Buffer>(src, {
-            responseType: 'arraybuffer',
-            timeout: DEFAULT_TIMEOUT,
-          })
-
-          const ext = SUPPORTED_EXTENSIONS.has(getExtFromUrl(src)) ? getExtFromUrl(src) : 'jpg'
-          fs.writeFileSync(join(currentInput, `${i}.${ext}`), Buffer.from(buffer))
-        } catch (e) {
-          ctx.logger('hajimi').warn(`下载第 ${i + 1} 张图片失败:`, e)
+        if (!paths || !paths.length) {
+          return '未生成输出文件，可能图片不够色或处理失败'
         }
-      }))
 
-      const [tipMessageId] = await session.send('图片处理中，请稍候...')
-
-      const { exitCode, stderr } = await runPythonScript(
-        pythonExec,
-        [
-          batchScript,
-          currentInput,
-          currentOutput,
-          '--pattern_image', patternImage,
-          '--head_image', headImage,
-        ],
-        hajimiDir
-      )
-
-      if (exitCode !== 0) {
-        await session.send(`处理失败`)
-        ctx.logger.error(stderr)
-      }
-
-      const files = fs.readdirSync(currentOutput)
-      if (!files.length) {
-        await session.send('未生成输出文件，可能还不够色')
-      }
-
-      await session.bot.deleteMessage(session.channelId, tipMessageId);
-
-      await Promise.all(files.map(file =>
-        session.send(h.image(`file://${join(currentOutput, file)}`))
-      ))
-
-      if (config.autoClean !== false) {
-        try {
-          fs.rmSync(currentInput, { recursive: true, force: true })
-          fs.rmSync(currentOutput, { recursive: true, force: true })
-        } catch (e) {
-          ctx.logger('hajimi').warn('清理临时文件失败:', e)
+        for (const p of paths) {
+          await session.send(h.image(`file://${p}`))
         }
+      } catch (e) {
+        ctx.logger('hajimi').error(e)
+        return '处理失败'
       }
     })
 }

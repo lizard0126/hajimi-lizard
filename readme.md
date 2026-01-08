@@ -13,7 +13,50 @@
 ---
 
 <details>
+<summary><strong><span style="font-size: 1.3em; color: #2a2a2a;">调用服务示例</span></strong></summary>
 
+### 外部插件如何调用 hajimi 服务
+
+- 首先在外部插件里声明依赖：
+
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">export const inject = ['hajimi']</pre>
+
+- 在index中注册服务：
+
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
+ctx.hajimi = {
+  processImages: (inputs) => processor.processImages(inputs),
+}
+</pre>
+
+- 然后就可以通过 ctx.hajimi.processImages 调用：
+
+<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
+const urls = [
+  'https://example.com/a.jpg',
+  'https://example.com/b.png'
+]
+
+try {
+  const results = await ctx.hajimi.processImages(urls)
+  if (!paths || !paths.length) {
+    return '未生成输出文件，可能图片不够色或处理失败'
+  }
+  for (const p of results) {
+    await session.send(h.image(\`file://\${p}\`))
+  }
+} catch (e) {
+  ctx.logger('hajimi').error(e)
+  return '处理失败'
+}
+</pre>
+
+- processImages 接收图片 URL 数组，返回本地生成图片路径数组
+- 如果返回为空，说明未生成输出文件
+
+</details>
+
+<details>
 <summary><strong><span style="font-size: 1.3em; color: #2a2a2a;">使用方法</span></strong></summary>
 
 ### 指令示例：
@@ -48,7 +91,7 @@
 <details>
 <summary><strong><span style="font-size: 1.3em; color: #2a2a2a;">如果要反馈建议或报告问题</span></strong></summary>
 
-<strong>可以[点这里](https://github.com/lizard0126/javbus-lizard/issues)创建议题~</strong>
+<strong>可以[点这里](https://github.com/lizard0126/hajimi-lizard/issues)创建议题~</strong>
 </details>
 
 <details>
