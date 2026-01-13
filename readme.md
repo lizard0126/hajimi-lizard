@@ -19,14 +19,10 @@
 
 - 首先在外部插件里声明依赖：
 
-<pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">export const inject = ['hajimi']</pre>
-
-- 在index中注册服务：
-
 <pre style="background-color: #f4f4f4; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">
-ctx.hajimi = {
-  processImages: (inputs) => processor.processImages(inputs),
-}
+import { Context, Schema, h } from 'koishi'
+import {} from 'koishi-plugin-hajimi-lizard'
+export const inject = ['hajimi']
 </pre>
 
 - 然后就可以通过 ctx.hajimi.processImages 调用：
@@ -37,18 +33,10 @@ const urls = [
   'https://example.com/b.png'
 ]
 
-try {
-  const results = await ctx.hajimi.processImages(urls)
-  if (!paths || !paths.length) {
-    return '未生成输出文件，可能图片不够色或处理失败'
-  }
+const results = await ctx.hajimi.processImages(urls)
   for (const p of results) {
     await session.send(h.image(\`file://\${p}\`))
   }
-} catch (e) {
-  ctx.logger('hajimi').error(e)
-  return '处理失败'
-}
 </pre>
 
 - processImages 接收图片 URL 数组，返回本地生成图片路径数组
